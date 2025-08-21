@@ -5,6 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+        USER: ${USER:-appuser}
     container_name: laravel_vue_app
     dns:
       - 8.8.8.8
@@ -40,28 +44,29 @@ services:
     networks:
       - app-network
 
-  # Servicio para Vite (desarrollo frontend)
+  # Servicio para Vite (desarrollo frontend) - Versión simplificada
   vite:
     image: node:24-alpine
     container_name: laravel_vue_vite
     working_dir: /var/www/html
     volumes:
       - ./src:/var/www/html
-      - vite_node_modules:/var/www/html/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=1
       - VITE_PORT=5173
       - VITE_HMR_HOST=host.docker.internal
       - VITE_HMR_CLIENT_PORT=5173
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # necesario en Docker Linux/WSL2
+      - "host.docker.internal:host-gateway"
     ports:
       - "5173:5173"
     command: >
       sh -c "
+        # Instalar dependencias como root (evita problemas de permisos)
         while [ ! -f package.json ]; do sleep 2; done &&
-        npm ci || npm i &&
-        npx vite --host 0.0.0.0 --port ${VITE_PORT}
+        rm -rf node_modules/.bin 2>/dev/null || true &&
+        npm ci --unsafe-perm=true --allow-root || npm i --unsafe-perm=true --allow-root &&
+        npx vite --host 0.0.0.0 --port 5173
       "
     depends_on: [app]
     networks: [app-network]
@@ -70,7 +75,6 @@ services:
 volumes:
   db_data:
   laravel_node_modules:
-  vite_node_modules:
 
 networks:
   app-network:
